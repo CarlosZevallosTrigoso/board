@@ -19,6 +19,7 @@
         #reset-button { background-color: #ff4141; color: white; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Roboto Mono', monospace; margin-top: 20px; }
         #reset-button.confirm { background-color: #cc0000; font-weight: bold; }
         #reset-status { margin-top: 10px; height: 20px; }
+        #char-counter { font-size: 0.8em; color: #888; text-align: right; }
     </style>
 </head>
 <body>
@@ -26,8 +27,9 @@
         <div id="board-section" class="hidden">
             <p>Bienvenido. Escribe una nueva entrada y presiona Enter.</p>
             <form id="post-form" class="prompt">
-                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="1000">
+                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
             </form>
+            <div id="char-counter">0/200</div>
             <div>
                 <button id="reset-button">Reset (Borrar todo)</button>
                 <p id="reset-status"></p>
@@ -76,7 +78,15 @@
         const messageInput = document.getElementById('message-input');
         const resetButton = document.getElementById('reset-button');
         const resetStatus = document.getElementById('reset-status');
+        const charCounter = document.getElementById('char-counter');
         let enteredEmail = "";
+
+        // --- Lógica del Contador de Caracteres ---
+        messageInput.addEventListener('input', () => {
+            const count = messageInput.value.length;
+            const limit = messageInput.maxLength;
+            charCounter.textContent = `${count}/${limit}`;
+        });
 
         // --- Lógica de Login ---
         emailInput.addEventListener('keydown', (event) => {
@@ -96,13 +106,11 @@
                 
                 signInWithEmailAndPassword(auth, enteredEmail, password)
                     .then((userCredential) => {
-                        // Login exitoso
                         loginSection.classList.add('hidden');
                         boardSection.classList.remove('hidden');
                         messageInput.focus();
                     })
                     .catch((error) => {
-                        // Login fallido
                         errorMessage.textContent = "Login incorrecto.";
                         passwordPromptContainer.classList.add('hidden');
                         passwordInput.value = "";
@@ -118,10 +126,11 @@
         postForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const messageText = messageInput.value.trim();
-            if (messageText.length > 0 && messageText.length <= 200) {
+            if (messageText.length > 0) {
                 try {
                     await addDoc(collection(db, "messages"), { text: messageText, createdAt: new Date() });
                     messageInput.value = '';
+                    charCounter.textContent = `0/${messageInput.maxLength}`; // Resetea el contador
                 } catch (error) {
                     console.error("Error al añadir documento: ", error);
                 }
