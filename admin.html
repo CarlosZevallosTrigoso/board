@@ -9,13 +9,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
         :root { --background-color: #ffffff; --text-color: #000000; --cursor-color: #000000; }
-        body { background-color: var(--background-color); color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; line-height: 1.5; margin: 0; padding: 20px; }
-        .terminal-container { width: 100%; max-width: 800px; margin: 0 auto; }
+        body { 
+            background-color: var(--background-color); 
+            color: var(--text-color); 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 16px; 
+            line-height: 1.5; 
+            margin: 0; 
+            padding: 0; /* Se elimina el padding para controlar el margen desde el contenedor */
+        }
+        .terminal-container { 
+            width: 100%; 
+            max-width: 800px; 
+            margin-top: 10vh; /* 10% de margen desde arriba */
+            margin-left: 10vw; /* 10% de margen desde la izquierda */
+        }
         .hidden { display: none; }
         #user-prompt, #password-prompt { margin-right: 8px; }
         input[type="password"], input[type="text"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
-        input:focus { animation: blink 1s step-end infinite; }
-        @keyframes blink { from, to { border-right: 2px solid var(--cursor-color); } 50% { border-right: 2px solid transparent; } }
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
         .prompt::before { content: '> '; margin-right: 8px; }
         #reset-button { background-color: #ff4141; color: white; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Roboto Mono', monospace; margin-top: 20px; }
@@ -30,7 +41,6 @@
             <form id="post-form" class="prompt">
                 <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
             </form>
-            <hr>
             <div>
                 <button id="reset-button">Reset (Borrar todo)</button>
                 <p id="reset-status"></p>
