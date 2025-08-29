@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terminal - Acceso</title>
+    <title>Notas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
-        :root { --background-color: #ffffff; --text-color: #000000; --cursor-color: #000000; }
+        :root { --background-color: #ffffff; --text-color: #000000; }
         body { 
             background-color: var(--background-color); 
             color: var(--text-color); 
@@ -24,36 +24,66 @@
             margin-top: 10vh; /* 10% de margen desde arriba */
             margin-left: 10vw; /* 10% de margen desde la izquierda */
         }
-        #prompt { margin-right: 8px; }
-        input[type="password"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
-        #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
+        h1 {
+            font-size: 1em; /* Mismo tamaño que el texto normal */
+            font-weight: normal; /* Sin negrita */
+            margin-bottom: 1.5em; /* Espacio antes de la lista de mensajes */
+            padding-bottom: 0.5em;
+        }
+        #messages-container { word-break: break-word; }
+        .message { 
+            margin-bottom: 1em; /* Aumenta el espacio para crear un salto de línea visual */
+        }
+        .message .timestamp { margin-right: 15px; opacity: 0.7; }
     </style>
 </head>
 <body>
     <div class="terminal-container">
-        <div>
-            <span id="prompt">password:</span>
-            <input type="password" id="password-input" autofocus>
-        </div>
-        <div id="error-message"></div>
+        <h1>Notas</h1>
+        <div id="messages-container">Cargando entradas...</div>
     </div>
 
-    <script>
-        const passwordInput = document.getElementById('password-input');
-        const errorMessage = document.getElementById('error-message');
-        const ACCESS_PASSWORD = "cualisigno2025!!";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        passwordInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                if (passwordInput.value === ACCESS_PASSWORD) {
-                    window.location.href = './board.html'; // Usamos ruta relativa
-                } else {
-                    errorMessage.textContent = "Acceso denegado.";
-                    passwordInput.value = "";
+        const firebaseConfig = {
+          apiKey: "AIzaSyCeQVpJTYM0UtRPmy4S8R38FYtl_b2ThzQ",
+          authDomain: "mi-terminal-czt.firebaseapp.com",
+          projectId: "mi-terminal-czt",
+          storageBucket: "mi-terminal-czt.appspot.com",
+          messagingSenderId: "979923860891",
+          appId: "1:979923860891:web:56ae8c88bd65cea9a5b53e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const messagesContainer = document.getElementById('messages-container');
+
+        function loadMessages() {
+            const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+            
+            onSnapshot(q, (querySnapshot) => {
+                messagesContainer.innerHTML = '';
+                if (querySnapshot.empty) {
+                    messagesContainer.textContent = "No hay entradas en el sistema.";
                 }
-            }
-        });
+                querySnapshot.forEach((doc) => {
+                    const messageData = doc.data();
+                    const messageElement = document.createElement('div');
+                    messageElement.classList.add('message');
+                    
+                    const date = messageData.createdAt.toDate();
+                    const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                    const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+                    messageElement.innerHTML = `<span class="timestamp">[${formattedDate} ${formattedTime}]</span><span class="text">${messageData.text}</span>`;
+                    messagesContainer.appendChild(messageElement);
+                });
+            });
+        }
+        
+        loadMessages();
     </script>
 </body>
 </html>
