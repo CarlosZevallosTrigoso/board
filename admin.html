@@ -8,24 +8,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
-        :root { --background-color: #ffffff; --text-color: #000000; --cursor-color: #000000; }
-        body { 
-            background-color: var(--background-color); 
-            color: var(--text-color); 
-            font-family: 'Roboto Mono', monospace; 
-            font-size: 16px; 
-            line-height: 1.5; 
-            margin: 0; 
-            padding: 0; /* Se elimina el padding para controlar el margen desde el contenedor */
-        }
-        .terminal-container { 
-            width: 100%; 
-            max-width: 800px; 
-            margin-top: 10vh; /* 10% de margen desde arriba */
-            margin-left: 10vw; /* 10% de margen desde la izquierda */
-        }
+        :root { --background-color: #ffffff; --text-color: #000000; }
+        body { background-color: var(--background-color); color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; line-height: 1.5; margin: 0; padding: 0; }
+        .terminal-container { width: 100%; max-width: 800px; margin-top: 10vh; margin-left: 10vw; }
         .hidden { display: none; }
-        #user-prompt, #password-prompt { margin-right: 8px; }
+        #email-prompt, #password-prompt { margin-right: 8px; }
         input[type="password"], input[type="text"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
         .prompt::before { content: '> '; margin-right: 8px; }
@@ -37,7 +24,7 @@
 <body>
     <div class="terminal-container">
         <div id="board-section" class="hidden">
-            <p>Bienvenido, czt. Escribe una nueva entrada y presiona Enter.</p>
+            <p>Bienvenido. Escribe una nueva entrada y presiona Enter.</p>
             <form id="post-form" class="prompt">
                 <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
             </form>
@@ -47,9 +34,9 @@
             </div>
         </div>
         <div id="login-section">
-             <div id="user-prompt-container">
-                <span id="user-prompt">login:</span>
-                <input type="text" id="user-input" autocomplete="off" autofocus>
+             <div id="email-prompt-container">
+                <span id="email-prompt">email:</span>
+                <input type="text" id="email-input" autocomplete="off" autofocus>
             </div>
             <div id="password-prompt-container" class="hidden">
                 <span id="password-prompt">password:</span>
@@ -61,6 +48,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -73,30 +61,29 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // --- Elementos del DOM ---
         const loginSection = document.getElementById('login-section');
         const boardSection = document.getElementById('board-section');
-        const userInput = document.getElementById('user-input');
+        const emailInput = document.getElementById('email-input');
         const passwordInput = document.getElementById('password-input');
-        const userPromptContainer = document.getElementById('user-prompt-container');
+        const emailPromptContainer = document.getElementById('email-prompt-container');
         const passwordPromptContainer = document.getElementById('password-prompt-container');
         const errorMessage = document.getElementById('error-message');
         const postForm = document.getElementById('post-form');
         const messageInput = document.getElementById('message-input');
         const resetButton = document.getElementById('reset-button');
         const resetStatus = document.getElementById('reset-status');
-
-        const ACCESS_USER = "czt";
-        const ACCESS_PASSWORD = "semeiotika2025!!";
-        let enteredUsername = "";
+        let enteredEmail = "";
 
         // --- Lógica de Login ---
-        userInput.addEventListener('keydown', (event) => {
+        emailInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                enteredUsername = userInput.value;
-                userPromptContainer.classList.add('hidden');
+                enteredEmail = emailInput.value;
+                emailPromptContainer.classList.add('hidden');
                 passwordPromptContainer.classList.remove('hidden');
                 passwordInput.focus();
             }
@@ -105,19 +92,25 @@
         passwordInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                if (enteredUsername === ACCESS_USER && passwordInput.value === ACCESS_PASSWORD) {
-                    loginSection.classList.add('hidden');
-                    boardSection.classList.remove('hidden');
-                    messageInput.focus();
-                } else {
-                    errorMessage.textContent = "Login incorrecto.";
-                    passwordPromptContainer.classList.add('hidden');
-                    passwordInput.value = "";
-                    userPromptContainer.classList.remove('hidden');
-                    userInput.value = "";
-                    userInput.focus();
-                    enteredUsername = "";
-                }
+                const password = passwordInput.value;
+                
+                signInWithEmailAndPassword(auth, enteredEmail, password)
+                    .then((userCredential) => {
+                        // Login exitoso
+                        loginSection.classList.add('hidden');
+                        boardSection.classList.remove('hidden');
+                        messageInput.focus();
+                    })
+                    .catch((error) => {
+                        // Login fallido
+                        errorMessage.textContent = "Login incorrecto.";
+                        passwordPromptContainer.classList.add('hidden');
+                        passwordInput.value = "";
+                        emailPromptContainer.classList.remove('hidden');
+                        emailInput.value = "";
+                        emailInput.focus();
+                        enteredEmail = "";
+                    });
             }
         });
 
@@ -138,7 +131,6 @@
         // --- Lógica para Borrar Todo ---
         resetButton.addEventListener('click', async () => {
             if (resetButton.classList.contains('confirm')) {
-                // Segundo clic: borrar todo
                 resetStatus.textContent = "Borrando...";
                 try {
                     const messagesCollection = collection(db, "messages");
@@ -151,17 +143,15 @@
                     resetStatus.textContent = "Todos los mensajes han sido borrados.";
                 } catch (error) {
                     console.error("Error al borrar todo: ", error);
-                    resetStatus.textContent = "Error al borrar. Revisa las reglas de Firestore.";
+                    resetStatus.textContent = "Error al borrar.";
                 } finally {
                     resetButton.classList.remove('confirm');
                     resetButton.textContent = 'Reset (Borrar todo)';
                 }
-
             } else {
-                // Primer clic: pedir confirmación
                 resetButton.classList.add('confirm');
                 resetButton.textContent = 'Confirmar Borrado';
-                resetStatus.textContent = "¿Estás seguro? Esta acción no se puede deshacer.";
+                resetStatus.textContent = "¿Estás seguro?";
             }
         });
     </script>
