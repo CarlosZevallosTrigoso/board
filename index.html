@@ -9,12 +9,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
         :root { --background-color: #ffffff; --text-color: #000000; --cursor-color: #000000; }
-        body { background-color: var(--background-color); color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; line-height: 1.5; margin: 0; padding: 20px; }
-        .terminal-container { width: 100%; max-width: 800px; margin: 0 auto; }
+        body { 
+            background-color: var(--background-color); 
+            color: var(--text-color); 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 16px; 
+            line-height: 1.5; 
+            margin: 0; 
+            padding: 0; 
+        }
+        .terminal-container { 
+            width: 100%; 
+            max-width: 800px; 
+            margin-top: 10vh; /* 10% de margen desde arriba */
+            margin-left: 10vw; /* 10% de margen desde la izquierda */
+        }
         #prompt { margin-right: 8px; }
         input[type="password"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
-        input:focus { animation: blink 1s step-end infinite; }
-        @keyframes blink { from, to { border-right: 2px solid var(--cursor-color); } 50% { border-right: 2px solid transparent; } }
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
     </style>
 </head>
@@ -36,8 +47,7 @@
             if (event.key === 'Enter') {
                 event.preventDefault();
                 if (passwordInput.value === ACCESS_PASSWORD) {
-                    // Si es correcta, redirige al tablón
-                    window.location.href = 'board.html';
+                    window.location.href = './board.html'; // Usamos ruta relativa
                 } else {
                     errorMessage.textContent = "Acceso denegado.";
                     passwordInput.value = "";
