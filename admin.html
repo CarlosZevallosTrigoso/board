@@ -18,15 +18,19 @@
         @keyframes blink { from, to { border-right: 2px solid var(--cursor-color); } 50% { border-right: 2px solid transparent; } }
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
         .prompt::before { content: '> '; margin-right: 8px; }
+        .delete-btn { color: #ff4141; cursor: pointer; text-decoration: underline; margin-left: 15px; }
+        .message .timestamp { opacity: 0.7; }
     </style>
 </head>
 <body>
     <div class="terminal-container">
         <div id="board-section" class="hidden">
-            <p>Bienvenido, czt. Escribe una nueva entrada y presiona Enter.</p>
+            <p>Bienvenido, czt. Escribe una nueva entrada o borra una existente.</p>
             <form id="post-form" class="prompt">
                 <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
             </form>
+            <hr>
+            <div id="admin-messages-container"></div>
         </div>
         <div id="login-section">
              <div id="user-prompt-container">
@@ -43,43 +47,37 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // TODO: Reemplaza esto con tu configuración de Firebase
+        // Pega aquí tu configuración de Firebase
         const firebaseConfig = {
-
-  apiKey: "AIzaSyCeQVpJTYM0UtRPmy4S8R38FYtl_b2ThzQ",
-
-  authDomain: "mi-terminal-czt.firebaseapp.com",
-
-  projectId: "mi-terminal-czt",
-
-  storageBucket: "mi-terminal-czt.firebasestorage.app",
-
-  messagingSenderId: "979923860891",
-
-  appId: "1:979923860891:web:56ae8c88bd65cea9a5b53e"
-
-};
-
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_AUTH_DOMAIN",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_STORAGE_BUCKET",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         const loginSection = document.getElementById('login-section');
         const boardSection = document.getElementById('board-section');
-        const userPromptContainer = document.getElementById('user-prompt-container');
-        const passwordPromptContainer = document.getElementById('password-prompt-container');
         const userInput = document.getElementById('user-input');
         const passwordInput = document.getElementById('password-input');
+        const userPromptContainer = document.getElementById('user-prompt-container');
+        const passwordPromptContainer = document.getElementById('password-prompt-container');
         const errorMessage = document.getElementById('error-message');
         const postForm = document.getElementById('post-form');
         const messageInput = document.getElementById('message-input');
+        const adminMessagesContainer = document.getElementById('admin-messages-container');
 
         const ACCESS_USER = "czt";
         const ACCESS_PASSWORD = "semeiotika2025!!";
         let enteredUsername = "";
 
+        // --- Lógica de Login ---
         userInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -97,6 +95,7 @@
                     loginSection.classList.add('hidden');
                     boardSection.classList.remove('hidden');
                     messageInput.focus();
+                    loadAdminMessages(); // Cargar mensajes en la vista de admin
                 } else {
                     errorMessage.textContent = "Login incorrecto.";
                     passwordPromptContainer.classList.add('hidden');
@@ -109,20 +108,53 @@
             }
         });
 
+        // --- Lógica para Postear ---
         postForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const messageText = messageInput.value.trim();
             if (messageText.length > 0 && messageText.length <= 200) {
                 try {
-                    await addDoc(collection(db, "messages"), {
-                        text: messageText,
-                        createdAt: new Date()
-                    });
+                    await addDoc(collection(db, "messages"), { text: messageText, createdAt: new Date() });
                     messageInput.value = '';
-                    // Opcional: mostrar un mensaje de éxito
                 } catch (error) {
                     console.error("Error al añadir documento: ", error);
                     alert("Error al guardar el mensaje.");
+                }
+            }
+        });
+
+        // --- Cargar Mensajes para el Admin ---
+        function loadAdminMessages() {
+            const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (querySnapshot) => {
+                adminMessagesContainer.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const messageData = doc.data();
+                    const messageElement = document.createElement('div');
+                    messageElement.classList.add('message');
+                    const date = messageData.createdAt.toDate();
+                    const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                    const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                    
+                    messageElement.innerHTML = `
+                        <span class="timestamp">[${formattedDate} ${formattedTime}]</span>
+                        <span class="text">${messageData.text}</span>
+                        <span class="delete-btn" data-id="${doc.id}">[borrar]</span>
+                    `;
+                    adminMessagesContainer.appendChild(messageElement);
+                });
+            });
+        }
+
+        // --- Lógica para Borrar ---
+        adminMessagesContainer.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const id = e.target.dataset.id;
+                try {
+                    await deleteDoc(doc(db, "messages", id));
+                } catch (error) {
+                    console.error("Error al borrar el documento: ", error);
+                    alert("No se pudo borrar el mensaje.");
                 }
             }
         });
