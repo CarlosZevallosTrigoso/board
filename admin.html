@@ -9,8 +9,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
         :root { --background-color: #ffffff; --text-color: #000000; }
-        body { background-color: var(--background-color); color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; line-height: 1.5; margin: 0; padding: 0; }
-        .terminal-container { width: 100%; max-width: 800px; margin-top: 10vh; margin-left: 10vw; }
+        body { 
+            background-color: var(--background-color); 
+            color: var(--text-color); 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 16px; 
+            line-height: 1.5; 
+            margin: 0; 
+            padding: 10vh 20px 20px 20px; /* Margen superior del 10% y padding lateral */
+            box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
+        }
+        .terminal-container { 
+            width: 100%; 
+            max-width: 800px; 
+            margin: 0; /* Se elimina el margen para que el padding del body controle el espaciado */
+        }
         .hidden { display: none; }
         #email-prompt, #password-prompt { margin-right: 8px; }
         input[type="password"], input[type="text"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
@@ -27,9 +40,9 @@
         <div id="board-section" class="hidden">
             <p>Bienvenido. Escribe una nueva entrada y presiona Enter.</p>
             <form id="post-form" class="prompt">
-                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="1000">
+                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
             </form>
-            <div id="char-counter">0/1000</div>
+            <div id="char-counter">0/200</div>
             <div>
                 <button id="reset-button">Reset (Borrar todo)</button>
                 <p id="reset-status"></p>
