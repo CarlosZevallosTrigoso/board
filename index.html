@@ -16,25 +16,32 @@
             font-size: 16px; 
             line-height: 1.5; 
             margin: 0; 
-            padding: 10vh 20px 20px 20px; /* Margen superior del 10% y padding lateral */
-            box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
+            padding: 10vh 20px 20px 20px; /* Padding por defecto para móviles */
+            box-sizing: border-box; 
         }
         .terminal-container { 
             width: 100%; 
             max-width: 800px; 
-            margin: 0; /* Se elimina el margen para que el padding del body controle el espaciado */
+            margin: 0; 
         }
         h1 {
-            font-size: 1em; /* Mismo tamaño que el texto normal */
-            font-weight: normal; /* Sin negrita */
-            margin-bottom: 1.5em; /* Espacio antes de la lista de mensajes */
+            font-size: 1em; 
+            font-weight: normal; 
+            margin-bottom: 1.5em;
             padding-bottom: 0.5em;
         }
         #messages-container { word-break: break-word; }
         .message { 
-            margin-bottom: 1em; /* Aumenta el espacio para crear un salto de línea visual */
+            margin-bottom: 1em; 
         }
         .message .timestamp { margin-right: 15px; opacity: 0.7; }
+
+        /* Estilos para pantallas de escritorio (más de 768px de ancho) */
+        @media (min-width: 768px) {
+            body {
+                padding-left: 20vw; /* Mueve el contenido 20% a la derecha */
+            }
+        }
     </style>
 </head>
 <body>
