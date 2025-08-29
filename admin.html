@@ -19,6 +19,7 @@
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
         .prompt::before { content: '> '; margin-right: 8px; }
         .delete-btn { color: #ff4141; cursor: pointer; text-decoration: underline; margin-left: 15px; }
+        .delete-btn.confirm-delete { font-weight: bold; }
         .message .timestamp { opacity: 0.7; }
     </style>
 </head>
@@ -95,7 +96,7 @@
                     loginSection.classList.add('hidden');
                     boardSection.classList.remove('hidden');
                     messageInput.focus();
-                    loadAdminMessages(); // Cargar mensajes en la vista de admin
+                    loadAdminMessages();
                 } else {
                     errorMessage.textContent = "Login incorrecto.";
                     passwordPromptContainer.classList.add('hidden');
@@ -118,7 +119,6 @@
                     messageInput.value = '';
                 } catch (error) {
                     console.error("Error al añadir documento: ", error);
-                    alert("Error al guardar el mensaje.");
                 }
             }
         });
@@ -146,16 +146,33 @@
             });
         }
 
-        // --- Lógica para Borrar ---
+        // --- Lógica para Borrar con Confirmación ---
         adminMessagesContainer.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('delete-btn')) {
-                const id = e.target.dataset.id;
+            const target = e.target;
+            if (!target.classList.contains('delete-btn')) return;
+
+            // Resetear otros botones que estén esperando confirmación
+            const allButtons = adminMessagesContainer.querySelectorAll('.delete-btn.confirm-delete');
+            allButtons.forEach(btn => {
+                if (btn !== target) {
+                    btn.classList.remove('confirm-delete');
+                    btn.textContent = '[borrar]';
+                }
+            });
+
+            // Si este botón ya está esperando, borrar
+            if (target.classList.contains('confirm-delete')) {
+                const id = target.dataset.id;
                 try {
                     await deleteDoc(doc(db, "messages", id));
                 } catch (error) {
                     console.error("Error al borrar el documento: ", error);
-                    alert("No se pudo borrar el mensaje.");
+                    target.textContent = '[error]'; // Muestra error si falla
                 }
+            } else {
+                // Primer clic, pedir confirmación
+                target.classList.add('confirm-delete');
+                target.textContent = '[confirmar borrado]';
             }
         });
     </script>
