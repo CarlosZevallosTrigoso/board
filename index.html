@@ -16,13 +16,13 @@
             font-size: 16px; 
             line-height: 1.5; 
             margin: 0; 
-            padding: 0; 
+            padding: 10vh 20px 20px 20px; /* Margen superior del 10% y padding lateral */
+            box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
         }
         .terminal-container { 
             width: 100%; 
             max-width: 800px; 
-            margin-top: 10vh; /* 10% de margen desde arriba */
-            margin-left: 10vw; /* 10% de margen desde la izquierda */
+            margin: 0; /* Se elimina el margen para que el padding del body controle el espaciado */
         }
         h1 {
             font-size: 1em; /* Mismo tamaño que el texto normal */
