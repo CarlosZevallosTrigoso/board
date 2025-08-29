@@ -16,13 +16,13 @@
             font-size: 16px; 
             line-height: 1.5; 
             margin: 0; 
-            padding: 10vh 20px 20px 20px; /* Margen superior del 10% y padding lateral */
-            box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
+            padding: 10vh 20px 20px 20px; /* Padding por defecto para móviles */
+            box-sizing: border-box; 
         }
         .terminal-container { 
             width: 100%; 
             max-width: 800px; 
-            margin: 0; /* Se elimina el margen para que el padding del body controle el espaciado */
+            margin: 0; 
         }
         .hidden { display: none; }
         #email-prompt, #password-prompt { margin-right: 8px; }
@@ -33,6 +33,13 @@
         #reset-button.confirm { background-color: #cc0000; font-weight: bold; }
         #reset-status { margin-top: 10px; height: 20px; }
         #char-counter { font-size: 0.8em; color: #888; text-align: right; }
+
+        /* Estilos para pantallas de escritorio (más de 768px de ancho) */
+        @media (min-width: 768px) {
+            body {
+                padding-left: 20vw; /* Mueve el contenido 20% a la derecha */
+            }
+        }
     </style>
 </head>
 <body>
