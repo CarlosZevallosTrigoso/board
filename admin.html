@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal - Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root { --background-color: #ffffff; --text-color: #000000; --cursor-color: #000000; }
+        body { background-color: var(--background-color); color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; line-height: 1.5; margin: 0; padding: 20px; }
+        .terminal-container { width: 100%; max-width: 800px; margin: 0 auto; }
+        .hidden { display: none; }
+        #user-prompt, #password-prompt { margin-right: 8px; }
+        input[type="password"], input[type="text"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
+        input:focus { animation: blink 1s step-end infinite; }
+        @keyframes blink { from, to { border-right: 2px solid var(--cursor-color); } 50% { border-right: 2px solid transparent; } }
+        #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
+        .prompt::before { content: '> '; margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="terminal-container">
+        <div id="board-section" class="hidden">
+            <p>Bienvenido, czt. Escribe una nueva entrada y presiona Enter.</p>
+            <form id="post-form" class="prompt">
+                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="200">
+            </form>
+        </div>
+        <div id="login-section">
+             <div id="user-prompt-container">
+                <span id="user-prompt">login:</span>
+                <input type="text" id="user-input" autocomplete="off" autofocus>
+            </div>
+            <div id="password-prompt-container" class="hidden">
+                <span id="password-prompt">password:</span>
+                <input type="password" id="password-input">
+            </div>
+            <div id="error-message"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // TODO: Reemplaza esto con tu configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_AUTH_DOMAIN",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_STORAGE_BUCKET",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const loginSection = document.getElementById('login-section');
+        const boardSection = document.getElementById('board-section');
+        const userPromptContainer = document.getElementById('user-prompt-container');
+        const passwordPromptContainer = document.getElementById('password-prompt-container');
+        const userInput = document.getElementById('user-input');
+        const passwordInput = document.getElementById('password-input');
+        const errorMessage = document.getElementById('error-message');
+        const postForm = document.getElementById('post-form');
+        const messageInput = document.getElementById('message-input');
+
+        const ACCESS_USER = "czt";
+        const ACCESS_PASSWORD = "semeiotika2025!!";
+        let enteredUsername = "";
+
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                enteredUsername = userInput.value;
+                userPromptContainer.classList.add('hidden');
+                passwordPromptContainer.classList.remove('hidden');
+                passwordInput.focus();
+            }
+        });
+
+        passwordInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (enteredUsername === ACCESS_USER && passwordInput.value === ACCESS_PASSWORD) {
+                    loginSection.classList.add('hidden');
+                    boardSection.classList.remove('hidden');
+                    messageInput.focus();
+                } else {
+                    errorMessage.textContent = "Login incorrecto.";
+                    passwordPromptContainer.classList.add('hidden');
+                    passwordInput.value = "";
+                    userPromptContainer.classList.remove('hidden');
+                    userInput.value = "";
+                    userInput.focus();
+                    enteredUsername = "";
+                }
+            }
+        });
+
+        postForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageText = messageInput.value.trim();
+            if (messageText.length > 0 && messageText.length <= 200) {
+                try {
+                    await addDoc(collection(db, "messages"), {
+                        text: messageText,
+                        createdAt: new Date()
+                    });
+                    messageInput.value = '';
+                    // Opcional: mostrar un mensaje de éxito
+                } catch (error) {
+                    console.error("Error al añadir documento: ", error);
+                    alert("Error al guardar el mensaje.");
+                }
+            }
+        });
+    </script>
+</body>
+</html>
