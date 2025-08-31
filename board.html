@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.gstatic.com https://*.firebaseapp.com https://*.googleapis.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
     <style>
         :root { --background-color: #ffffff; --text-color: #000000; }
         body { 
@@ -21,27 +22,72 @@
         .terminal-container { 
             width: 100%; 
             max-width: 800px; 
-            margin-top: 10vh; /* 10% de margen desde arriba */
-            margin-left: 10vw; /* 10% de margen desde la izquierda */
+            margin-top: 10vh;
+            margin-left: 10vw;
         }
         h1 {
-            font-size: 1em; /* Mismo tamaño que el texto normal */
-            font-weight: normal; /* Sin negrita */
-            margin-bottom: 1.5em; /* Espacio antes de la lista de mensajes */
+            font-size: 1em;
+            font-weight: normal;
+            margin-bottom: 1.5em;
             padding-bottom: 0.5em;
-            /* Se ha eliminado la línea de borde inferior */
         }
-        #messages-container { word-break: break-word; }
+        #messages-container { 
+            word-break: break-word; 
+        }
         .message { 
-            margin-bottom: 1em; /* Aumenta el espacio para crear un salto de línea visual */
+            margin-bottom: 1em;
         }
-        .message .timestamp { margin-right: 15px; opacity: 0.7; }
+        .message .timestamp { 
+            margin-right: 15px; 
+            opacity: 0.7; 
+        }
+        .error-message {
+            color: #ff4141;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .loading {
+            opacity: 0.7;
+        }
+        #connection-status {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            display: none;
+        }
+        .retry-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8em;
+            margin-left: 10px;
+            border-radius: 3px;
+        }
+        .retry-button:hover {
+            background-color: #0056b3;
+        }
+
+        @media (max-width: 768px) {
+            .terminal-container {
+                margin-left: 5vw;
+                margin-right: 5vw;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="terminal-container">
         <h1>Notas</h1>
-        <div id="messages-container">Cargando entradas...</div>
+        <div id="connection-status" class="error-message">
+            <span id="status-message"></span>
+            <button id="retry-button" class="retry-button">Reintentar</button>
+        </div>
+        <div id="messages-container" class="loading">Cargando entradas...</div>
     </div>
 
     <script type="module">
@@ -60,31 +106,208 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const messagesContainer = document.getElementById('messages-container');
+        const connectionStatus = document.getElementById('connection-status');
+        const statusMessage = document.getElementById('status-message');
+        const retryButton = document.getElementById('retry-button');
 
-        function loadMessages() {
-            const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-            
-            onSnapshot(q, (querySnapshot) => {
-                messagesContainer.innerHTML = '';
-                if (querySnapshot.empty) {
-                    messagesContainer.textContent = "No hay entradas en el sistema.";
-                }
-                querySnapshot.forEach((doc) => {
-                    const messageData = doc.data();
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add('message');
-                    
-                    const date = messageData.createdAt.toDate();
-                    const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-                    const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        let unsubscribeFunction = null;
+        let retryCount = 0;
+        const maxRetries = 3;
 
-                    messageElement.innerHTML = `<span class="timestamp">[${formattedDate} ${formattedTime}]</span><span class="text">${messageData.text}</span>`;
-                    messagesContainer.appendChild(messageElement);
-                });
-            });
+        // Función para sanitizar contenido HTML
+        function sanitizeHTML(str) {
+            if (typeof str !== 'string') return '';
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
         }
-        
-        loadMessages();
+
+        // Función para validar y formatear timestamp
+        function formatTimestamp(timestamp) {
+            try {
+                if (!timestamp || !timestamp.toDate) {
+                    return '[Fecha inválida]';
+                }
+                const date = timestamp.toDate();
+                if (isNaN(date.getTime())) {
+                    return '[Fecha inválida]';
+                }
+                const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                return `[${formattedDate} ${formattedTime}]`;
+            } catch (error) {
+                console.error('Error al formatear timestamp:', error);
+                return '[Fecha inválida]';
+            }
+        }
+
+        // Función para mostrar estado de conexión
+        function showConnectionStatus(message, showRetry = false) {
+            statusMessage.textContent = message;
+            connectionStatus.style.display = 'block';
+            retryButton.style.display = showRetry ? 'inline-block' : 'none';
+        }
+
+        function hideConnectionStatus() {
+            connectionStatus.style.display = 'none';
+            retryCount = 0;
+        }
+
+        // Función para crear elemento de mensaje
+        function createMessageElement(messageData, docId) {
+            try {
+                // Validar que el documento tenga los campos requeridos
+                if (!messageData.text || typeof messageData.text !== 'string') {
+                    console.warn('Documento con campo text inválido:', docId);
+                    return null;
+                }
+
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.setAttribute('data-id', docId);
+                
+                const formattedTimestamp = formatTimestamp(messageData.createdAt);
+                const sanitizedText = sanitizeHTML(messageData.text);
+                
+                messageElement.innerHTML = `<span class="timestamp">${formattedTimestamp}</span><span class="text">${sanitizedText}</span>`;
+                
+                return messageElement;
+            } catch (error) {
+                console.error('Error creando elemento de mensaje:', error);
+                return null;
+            }
+        }
+
+        // Función principal para cargar mensajes
+        function loadMessages() {
+            try {
+                // Limpiar suscripción anterior si existe
+                if (unsubscribeFunction) {
+                    unsubscribeFunction();
+                }
+
+                const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+                
+                unsubscribeFunction = onSnapshot(q, 
+                    (querySnapshot) => {
+                        try {
+                            messagesContainer.classList.remove('loading');
+                            messagesContainer.innerHTML = '';
+                            hideConnectionStatus();
+                            
+                            if (querySnapshot.empty) {
+                                messagesContainer.textContent = "No hay entradas en el sistema.";
+                                return;
+                            }
+                            
+                            // Procesar documentos con validación
+                            const validMessages = [];
+                            querySnapshot.forEach((doc) => {
+                                const messageElement = createMessageElement(doc.data(), doc.id);
+                                if (messageElement) {
+                                    validMessages.push(messageElement);
+                                }
+                            });
+                            
+                            // Agregar mensajes válidos al contenedor
+                            validMessages.forEach(messageElement => {
+                                messagesContainer.appendChild(messageElement);
+                            });
+
+                            // Mostrar conteo de mensajes si es útil
+                            if (validMessages.length > 0) {
+                                console.log(`Cargados ${validMessages.length} mensajes correctamente`);
+                            }
+                            
+                        } catch (snapshotError) {
+                            console.error('Error procesando snapshot:', snapshotError);
+                            messagesContainer.classList.remove('loading');
+                            messagesContainer.textContent = "Error al procesar los datos recibidos.";
+                            showConnectionStatus('Error al procesar los mensajes recibidos.', true);
+                        }
+                    },
+                    (error) => {
+                        console.error('Error en la conexión a Firestore:', error);
+                        messagesContainer.classList.remove('loading');
+                        
+                        // Diferentes mensajes según el tipo de error
+                        let errorMessage = 'Error de conexión con la base de datos.';
+                        if (error.code === 'permission-denied') {
+                            errorMessage = 'Acceso denegado. Verifique los permisos de la base de datos.';
+                        } else if (error.code === 'unavailable') {
+                            errorMessage = 'Servicio temporalmente no disponible.';
+                        }
+                        
+                        messagesContainer.textContent = "No se pudieron cargar las entradas.";
+                        showConnectionStatus(errorMessage, true);
+                    }
+                );
+
+            } catch (error) {
+                console.error('Error inicializando conexión:', error);
+                messagesContainer.classList.remove('loading');
+                messagesContainer.textContent = "Error al inicializar la conexión.";
+                showConnectionStatus('Error crítico al inicializar la aplicación.', true);
+            }
+        }
+
+        // Función para manejar reintentos
+        function handleRetry() {
+            if (retryCount >= maxRetries) {
+                showConnectionStatus(`Máximo número de reintentos alcanzado (${maxRetries}). Recarga la página.`, false);
+                retryButton.textContent = 'Recargar página';
+                retryButton.onclick = () => window.location.reload();
+                return;
+            }
+            
+            retryCount++;
+            messagesContainer.classList.add('loading');
+            messagesContainer.textContent = `Reintentando conexión... (${retryCount}/${maxRetries})`;
+            statusMessage.textContent = `Reintentando... (${retryCount}/${maxRetries})`;
+            retryButton.disabled = true;
+            
+            // Esperar antes del reintento
+            setTimeout(() => {
+                retryButton.disabled = false;
+                loadMessages();
+            }, 2000);
+        }
+
+        // Event listeners
+        retryButton.addEventListener('click', handleRetry);
+
+        // Manejo de visibilidad de página para optimizar recursos
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Página no visible, podríamos pausar actualizaciones si es necesario
+                console.log('Página oculta - manteniendo conexión');
+            } else {
+                // Página visible, asegurar que la conexión esté activa
+                console.log('Página visible');
+                if (!unsubscribeFunction) {
+                    loadMessages();
+                }
+            }
+        });
+
+        // Cleanup al descargar la página
+        window.addEventListener('beforeunload', () => {
+            if (unsubscribeFunction) {
+                unsubscribeFunction();
+            }
+        });
+
+        // Inicializar con manejo de errores
+        try {
+            loadMessages();
+        } catch (error) {
+            console.error('Error crítico al inicializar:', error);
+            messagesContainer.classList.remove('loading');
+            messagesContainer.textContent = "Error crítico al inicializar la aplicación.";
+            showConnectionStatus('Error crítico. Recarga la página.', false);
+            retryButton.textContent = 'Recargar página';
+            retryButton.onclick = () => window.location.reload();
+        }
     </script>
 </body>
 </html>
