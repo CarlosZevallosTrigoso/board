@@ -36,7 +36,8 @@
             margin-bottom: 1em; 
         }
         .message .timestamp { 
-            margin-right: 15px; 
+            display: block;
+            margin-bottom: 0.3em;
             color: #a11d1d;
             font-size: 0.9em;
         }
@@ -98,9 +99,28 @@
                 if (isNaN(date.getTime())) {
                     return '[Fecha inválida]';
                 }
-                const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-                const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                return `[${formattedDate} ${formattedTime}]`;
+                
+                const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                const diaSemana = diasSemana[date.getDay()];
+                
+                const dia = date.getDate().toString().padStart(2, '0');
+                const mes = (date.getMonth() + 1).toString().padStart(2, '0');
+                const año = date.getFullYear();
+                
+                let horas = date.getHours();
+                const minutos = date.getMinutes().toString().padStart(2, '0');
+                const segundos = date.getSeconds().toString().padStart(2, '0');
+                const periodo = horas >= 12 ? 'p.m.' : 'a.m.';
+                
+                if (horas > 12) {
+                    horas -= 12;
+                } else if (horas === 0) {
+                    horas = 12;
+                }
+                
+                const horasFormateadas = horas.toString().padStart(2, '0');
+                
+                return `[${diaSemana} ${dia}/${mes}/${año} ${horasFormateadas}:${minutos}:${segundos} ${periodo}]`;
             } catch (error) {
                 console.error('Error al formatear timestamp:', error);
                 return '[Fecha inválida]';
@@ -145,7 +165,7 @@
                                     const formattedTimestamp = formatTimestamp(messageData.createdAt);
                                     const sanitizedText = sanitizeHTML(messageData.text);
                                     
-                                    messageElement.innerHTML = `<span class="timestamp">${formattedTimestamp}</span><span class="text">${sanitizedText}</span>`;
+                                    messageElement.innerHTML = `<span class="timestamp">${formattedTimestamp}</span><div class="text">${sanitizedText}</div>`;
                                     messagesContainer.appendChild(messageElement);
                                 } catch (docError) {
                                     console.error('Error procesando documento:', docError);
