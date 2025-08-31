@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.gstatic.com https://*.firebaseapp.com https://*.googleapis.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
     <style>
         :root { --background-color: #ffffff; --text-color: #000000; }
         body { 
@@ -16,7 +17,7 @@
             font-size: 16px; 
             line-height: 1.5; 
             margin: 0; 
-            padding: 10vh 20px 20px 20px; /* Padding por defecto para móviles */
+            padding: 10vh 20px 20px 20px;
             box-sizing: border-box; 
         }
         .terminal-container { 
@@ -26,18 +27,46 @@
         }
         .hidden { display: none; }
         #email-prompt, #password-prompt { margin-right: 8px; }
-        input[type="password"], input[type="text"] { background-color: transparent; border: none; color: var(--text-color); font-family: 'Roboto Mono', monospace; font-size: 16px; outline: none; padding: 0; width: 50%; }
+        input[type="password"], input[type="text"] { 
+            background-color: transparent; 
+            border: none; 
+            color: var(--text-color); 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 16px; 
+            outline: none; 
+            padding: 0; 
+            width: 50%; 
+        }
         #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
         .prompt::before { content: '> '; margin-right: 8px; }
-        #reset-button { background-color: #ff4141; color: white; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Roboto Mono', monospace; margin-top: 20px; }
+        #reset-button { 
+            background-color: #ff4141; 
+            color: white; 
+            border: none; 
+            padding: 8px 15px; 
+            cursor: pointer; 
+            font-family: 'Roboto Mono', monospace; 
+            margin-top: 20px; 
+        }
+        #reset-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
         #reset-button.confirm { background-color: #cc0000; font-weight: bold; }
         #reset-status { margin-top: 10px; height: 20px; }
         #char-counter { font-size: 0.8em; color: #888; text-align: right; }
+        #session-status { 
+            font-size: 0.8em; 
+            color: #888; 
+            margin-bottom: 10px; 
+            text-align: right;
+        }
+        .warning { color: #ff8800; }
+        .success { color: #00cc00; }
 
-        /* Estilos para pantallas de escritorio (más de 768px de ancho) */
         @media (min-width: 768px) {
             body {
-                padding-left: 20vw; /* Mueve el contenido 20% a la derecha */
+                padding-left: 20vw;
             }
         }
     </style>
@@ -45,6 +74,7 @@
 <body>
     <div class="terminal-container">
         <div id="board-section" class="hidden">
+            <div id="session-status"></div>
             <p>Bienvenido. Escribe una nueva entrada y presiona Enter.</p>
             <form id="post-form" class="prompt">
                 <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="1500">
@@ -52,26 +82,28 @@
             <div id="char-counter">0/1500</div>
             <div>
                 <button id="reset-button">Reset (Borrar todo)</button>
+                <button id="logout-button" style="background-color: #666; color: white; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Roboto Mono', monospace; margin-left: 10px;">Cerrar Sesión</button>
                 <p id="reset-status"></p>
             </div>
         </div>
         <div id="login-section">
              <div id="email-prompt-container">
                 <span id="email-prompt">email:</span>
-                <input type="text" id="email-input" autocomplete="off" autofocus>
+                <input type="email" id="email-input" autocomplete="off" autofocus>
             </div>
             <div id="password-prompt-container" class="hidden">
                 <span id="password-prompt">password:</span>
-                <input type="password" id="password-input">
+                <input type="password" id="password-input" autocomplete="current-password">
             </div>
             <div id="error-message"></div>
+            <div id="login-attempts" style="font-size: 0.8em; color: #888; margin-top: 10px;"></div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCeQVpJTYM0UtRPmy4S8R38FYtl_b2ThzQ",
@@ -86,7 +118,15 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- Elementos del DOM ---
+        // Variables de seguridad
+        let loginAttempts = 0;
+        const maxLoginAttempts = 3;
+        let loginBlockedUntil = 0;
+        const sessionTimeout = 30 * 60 * 1000; // 30 minutos
+        let sessionTimer = null;
+        let lastActivityTime = Date.now();
+
+        // Elementos del DOM
         const loginSection = document.getElementById('login-section');
         const boardSection = document.getElementById('board-section');
         const emailInput = document.getElementById('email-input');
@@ -97,41 +137,189 @@
         const postForm = document.getElementById('post-form');
         const messageInput = document.getElementById('message-input');
         const resetButton = document.getElementById('reset-button');
+        const logoutButton = document.getElementById('logout-button');
         const resetStatus = document.getElementById('reset-status');
         const charCounter = document.getElementById('char-counter');
+        const sessionStatus = document.getElementById('session-status');
+        const loginAttemptsDisplay = document.getElementById('login-attempts');
         let enteredEmail = "";
 
-        // --- Lógica del Contador de Caracteres ---
+        // Funciones de seguridad
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email) && email.length <= 254;
+        }
+
+        function sanitizeInput(input) {
+            return input.replace(/[<>'"&]/g, function(match) {
+                switch(match) {
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '"': return '&quot;';
+                    case "'": return '&#x27;';
+                    case '&': return '&amp;';
+                    default: return match;
+                }
+            }).substring(0, 1500);
+        }
+
+        function updateSessionStatus() {
+            const remainingTime = Math.max(0, sessionTimeout - (Date.now() - lastActivityTime));
+            const minutes = Math.floor(remainingTime / 60000);
+            const seconds = Math.floor((remainingTime % 60000) / 1000);
+            sessionStatus.textContent = `Sesión expira en: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (remainingTime <= 5 * 60 * 1000) { // 5 minutos restantes
+                sessionStatus.classList.add('warning');
+            } else {
+                sessionStatus.classList.remove('warning');
+            }
+        }
+
+        function startSessionTimer() {
+            if (sessionTimer) clearInterval(sessionTimer);
+            
+            sessionTimer = setInterval(() => {
+                if (Date.now() - lastActivityTime > sessionTimeout) {
+                    logout('Sesión expirada por inactividad');
+                } else {
+                    updateSessionStatus();
+                }
+            }, 1000);
+        }
+
+        function resetActivityTimer() {
+            lastActivityTime = Date.now();
+        }
+
+        function logout(reason = 'Sesión cerrada') {
+            if (sessionTimer) clearInterval(sessionTimer);
+            signOut(auth).then(() => {
+                showLoginSection();
+                errorMessage.textContent = reason;
+                errorMessage.classList.add('warning');
+            });
+        }
+
+        function showLoginSection() {
+            loginSection.classList.remove('hidden');
+            boardSection.classList.add('hidden');
+            emailPromptContainer.classList.remove('hidden');
+            passwordPromptContainer.classList.add('hidden');
+            emailInput.focus();
+            enteredEmail = "";
+            emailInput.value = "";
+            passwordInput.value = "";
+        }
+
+        function showBoardSection() {
+            loginSection.classList.add('hidden');
+            boardSection.classList.remove('hidden');
+            messageInput.focus();
+            startSessionTimer();
+        }
+
+        function updateLoginAttemptsDisplay() {
+            if (loginAttempts > 0) {
+                const remaining = maxLoginAttempts - loginAttempts;
+                loginAttemptsDisplay.textContent = `Intentos restantes: ${remaining}`;
+                if (remaining <= 1) {
+                    loginAttemptsDisplay.classList.add('warning');
+                }
+            } else {
+                loginAttemptsDisplay.textContent = '';
+                loginAttemptsDisplay.classList.remove('warning');
+            }
+        }
+
+        function isLoginBlocked() {
+            return Date.now() < loginBlockedUntil;
+        }
+
+        // Monitoreo del estado de autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                showBoardSection();
+                loginAttempts = 0;
+                updateLoginAttemptsDisplay();
+            } else {
+                showLoginSection();
+            }
+        });
+
+        // Listeners para actividad del usuario
+        ['keydown', 'mousedown', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, resetActivityTimer, true);
+        });
+
+        // Lógica del contador de caracteres
         messageInput.addEventListener('input', () => {
             const count = messageInput.value.length;
             const limit = messageInput.maxLength;
             charCounter.textContent = `${count}/${limit}`;
+            resetActivityTimer();
         });
 
-        // --- Lógica de Login ---
+        // Lógica de Login
         emailInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                enteredEmail = emailInput.value;
+                
+                if (isLoginBlocked()) {
+                    const timeLeft = Math.ceil((loginBlockedUntil - Date.now()) / 1000);
+                    errorMessage.textContent = `Bloqueado temporalmente. Intenta en ${timeLeft} segundos.`;
+                    return;
+                }
+                
+                const email = emailInput.value.trim();
+                
+                if (!isValidEmail(email)) {
+                    errorMessage.textContent = "Formato de email inválido.";
+                    return;
+                }
+                
+                enteredEmail = email;
                 emailPromptContainer.classList.add('hidden');
                 passwordPromptContainer.classList.remove('hidden');
                 passwordInput.focus();
+                errorMessage.textContent = "";
             }
         });
 
         passwordInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
+                
+                if (isLoginBlocked()) {
+                    const timeLeft = Math.ceil((loginBlockedUntil - Date.now()) / 1000);
+                    errorMessage.textContent = `Bloqueado temporalmente. Intenta en ${timeLeft} segundos.`;
+                    return;
+                }
+                
                 const password = passwordInput.value;
+                
+                if (password.length < 6) {
+                    errorMessage.textContent = "Contraseña muy corta.";
+                    return;
+                }
                 
                 signInWithEmailAndPassword(auth, enteredEmail, password)
                     .then((userCredential) => {
-                        loginSection.classList.add('hidden');
-                        boardSection.classList.remove('hidden');
-                        messageInput.focus();
+                        resetActivityTimer();
+                        // El estado se maneja en onAuthStateChanged
                     })
                     .catch((error) => {
-                        errorMessage.textContent = "Login incorrecto.";
+                        loginAttempts++;
+                        updateLoginAttemptsDisplay();
+                        
+                        if (loginAttempts >= maxLoginAttempts) {
+                            loginBlockedUntil = Date.now() + 5 * 60 * 1000; // 5 minutos
+                            errorMessage.textContent = "Demasiados intentos fallidos. Bloqueado temporalmente.";
+                            loginAttempts = 0; // Reset para el próximo período
+                        } else {
+                            errorMessage.textContent = "Credenciales incorrectas.";
+                        }
+                        
                         passwordPromptContainer.classList.add('hidden');
                         passwordInput.value = "";
                         emailPromptContainer.classList.remove('hidden');
@@ -142,45 +330,125 @@
             }
         });
 
-        // --- Lógica para Postear ---
+        // Lógica para postear con validación mejorada
         postForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            resetActivityTimer();
+            
             const messageText = messageInput.value.trim();
-            if (messageText.length > 0) {
-                try {
-                    await addDoc(collection(db, "messages"), { text: messageText, createdAt: new Date() });
-                    messageInput.value = '';
-                    charCounter.textContent = `0/${messageInput.maxLength}`; // Resetea el contador
-                } catch (error) {
-                    console.error("Error al añadir documento: ", error);
-                }
+            
+            // Validaciones
+            if (messageText.length === 0) {
+                resetStatus.textContent = "El mensaje no puede estar vacío.";
+                return;
+            }
+            
+            if (messageText.length > 1500) {
+                resetStatus.textContent = "El mensaje excede el límite de caracteres.";
+                return;
+            }
+            
+            // Sanitizar entrada
+            const sanitizedMessage = sanitizeInput(messageText);
+            
+            // Prevenir spam - limitar frecuencia de posts
+            const now = Date.now();
+            const lastPost = localStorage.getItem('lastPostTime');
+            if (lastPost && (now - parseInt(lastPost)) < 1000) { // 1 segundo mínimo entre posts
+                resetStatus.textContent = "Espera un momento antes de enviar otro mensaje.";
+                return;
+            }
+            
+            try {
+                resetStatus.textContent = "Enviando...";
+                await addDoc(collection(db, "messages"), { 
+                    text: sanitizedMessage, 
+                    createdAt: serverTimestamp(),
+                    userId: auth.currentUser.uid
+                });
+                messageInput.value = '';
+                charCounter.textContent = `0/${messageInput.maxLength}`;
+                resetStatus.textContent = "Mensaje enviado correctamente.";
+                resetStatus.classList.add('success');
+                localStorage.setItem('lastPostTime', now.toString());
+                
+                // Limpiar mensaje de éxito después de 3 segundos
+                setTimeout(() => {
+                    resetStatus.textContent = "";
+                    resetStatus.classList.remove('success');
+                }, 3000);
+                
+            } catch (error) {
+                console.error("Error al añadir documento: ", error);
+                resetStatus.textContent = "Error al enviar el mensaje.";
             }
         });
 
-        // --- Lógica para Borrar Todo ---
+        // Lógica para logout
+        logoutButton.addEventListener('click', () => {
+            logout('Sesión cerrada manualmente');
+        });
+
+        // Lógica para borrar todo con confirmación mejorada
         resetButton.addEventListener('click', async () => {
+            resetActivityTimer();
+            
             if (resetButton.classList.contains('confirm')) {
                 resetStatus.textContent = "Borrando...";
+                resetButton.disabled = true;
+                
                 try {
                     const messagesCollection = collection(db, "messages");
                     const querySnapshot = await getDocs(messagesCollection);
                     const deletePromises = [];
+                    
                     querySnapshot.forEach((doc) => {
                         deletePromises.push(deleteDoc(doc.ref));
                     });
+                    
                     await Promise.all(deletePromises);
-                    resetStatus.textContent = "Todos los mensajes han sido borrados.";
+                    resetStatus.textContent = `${deletePromises.length} mensajes han sido borrados.`;
+                    resetStatus.classList.add('success');
+                    
+                    // Log de auditoría básico en consola
+                    console.log(`Admin ${auth.currentUser.email} deleted all messages at ${new Date().toISOString()}`);
+                    
                 } catch (error) {
                     console.error("Error al borrar todo: ", error);
-                    resetStatus.textContent = "Error al borrar.";
+                    resetStatus.textContent = "Error al borrar los mensajes.";
                 } finally {
                     resetButton.classList.remove('confirm');
                     resetButton.textContent = 'Reset (Borrar todo)';
+                    resetButton.disabled = false;
+                    
+                    setTimeout(() => {
+                        resetStatus.textContent = "";
+                        resetStatus.classList.remove('success');
+                    }, 5000);
                 }
             } else {
                 resetButton.classList.add('confirm');
                 resetButton.textContent = 'Confirmar Borrado';
-                resetStatus.textContent = "¿Estás seguro?";
+                resetStatus.textContent = "¿Estás seguro? Esta acción no se puede deshacer.";
+                resetStatus.classList.add('warning');
+                
+                // Auto-revert después de 10 segundos sin confirmación
+                setTimeout(() => {
+                    if (resetButton.classList.contains('confirm')) {
+                        resetButton.classList.remove('confirm');
+                        resetButton.textContent = 'Reset (Borrar todo)';
+                        resetStatus.textContent = "";
+                        resetStatus.classList.remove('warning');
+                    }
+                }, 10000);
+            }
+        });
+
+        // Prevenir que la página se cierre accidentalmente durante operaciones críticas
+        window.addEventListener('beforeunload', (event) => {
+            if (resetButton.classList.contains('confirm')) {
+                event.preventDefault();
+                event.returnValue = '';
             }
         });
     </script>
