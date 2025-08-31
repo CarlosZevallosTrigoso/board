@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terminal - Board</title>
+    <title>Terminal - Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
@@ -17,83 +17,93 @@
             font-size: 16px; 
             line-height: 1.5; 
             margin: 0; 
-            padding: 0; 
+            padding: 10vh 20px 20px 20px;
+            box-sizing: border-box; 
         }
         .terminal-container { 
             width: 100%; 
             max-width: 800px; 
-            margin-top: 10vh;
-            margin-left: 10vw;
+            margin: 0; 
         }
-        h1 {
-            font-size: 1em;
-            font-weight: normal;
-            margin-bottom: 1.5em;
-            padding-bottom: 0.5em;
+        .hidden { display: none; }
+        #email-prompt, #password-prompt { margin-right: 8px; }
+        input[type="password"], input[type="text"] { 
+            background-color: transparent; 
+            border: none; 
+            color: var(--text-color); 
+            font-family: 'Roboto Mono', monospace; 
+            font-size: 16px; 
+            outline: none; 
+            padding: 0; 
+            width: 50%; 
         }
-        #messages-container { 
-            word-break: break-word; 
+        #error-message { color: #ff4141; margin-top: 10px; height: 20px; }
+        .prompt::before { content: '> '; margin-right: 8px; }
+        #reset-button { 
+            background-color: #ff4141; 
+            color: white; 
+            border: none; 
+            padding: 8px 15px; 
+            cursor: pointer; 
+            font-family: 'Roboto Mono', monospace; 
+            margin-top: 20px; 
         }
-        .message { 
-            margin-bottom: 1em;
+        #reset-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
-        .message .timestamp { 
-            display: block;
-            margin-bottom: 0.3em;
-            opacity: 0.7; 
+        #reset-button.confirm { background-color: #cc0000; font-weight: bold; }
+        #reset-status { margin-top: 10px; height: 20px; }
+        #char-counter { font-size: 0.8em; color: #888; text-align: right; }
+        #session-status { 
+            font-size: 0.8em; 
+            color: #888; 
+            margin-bottom: 10px; 
+            text-align: right;
         }
-        .error-message {
-            color: #ff4141;
-            margin-top: 10px;
-            font-size: 0.9em;
-        }
-        .loading {
-            opacity: 0.7;
-        }
-        #connection-status {
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
-            display: none;
-        }
-        .retry-button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.8em;
-            margin-left: 10px;
-            border-radius: 3px;
-        }
-        .retry-button:hover {
-            background-color: #0056b3;
-        }
+        .warning { color: #ff8800; }
+        .success { color: #00cc00; }
 
-        @media (max-width: 768px) {
-            .terminal-container {
-                margin-left: 5vw;
-                margin-right: 5vw;
+        @media (min-width: 768px) {
+            body {
+                padding-left: 20vw;
             }
         }
     </style>
 </head>
 <body>
     <div class="terminal-container">
-        <h1>Notas</h1>
-        <div id="connection-status" class="error-message">
-            <span id="status-message"></span>
-            <button id="retry-button" class="retry-button">Reintentar</button>
+        <div id="board-section" class="hidden">
+            <div id="session-status"></div>
+            <p>Bienvenido. Escribe una nueva entrada y presiona Enter.</p>
+            <form id="post-form" class="prompt">
+                <input type="text" id="message-input" autocomplete="off" placeholder="" maxlength="1500">
+            </form>
+            <div id="char-counter">0/1500</div>
+            <div>
+                <button id="reset-button">Reset (Borrar todo)</button>
+                <button id="logout-button" style="background-color: #666; color: white; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Roboto Mono', monospace; margin-left: 10px;">Cerrar Sesión</button>
+                <p id="reset-status"></p>
+            </div>
         </div>
-        <div id="messages-container" class="loading">Cargando entradas...</div>
+        <div id="login-section">
+             <div id="email-prompt-container">
+                <span id="email-prompt">email:</span>
+                <input type="email" id="email-input" autocomplete="off" autofocus>
+            </div>
+            <div id="password-prompt-container" class="hidden">
+                <span id="password-prompt">password:</span>
+                <input type="password" id="password-input" autocomplete="current-password">
+            </div>
+            <div id="error-message"></div>
+            <div id="login-attempts" style="font-size: 0.8em; color: #888; margin-top: 10px;"></div>
+        </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCeQVpJTYM0UtRPmy4S8R38FYtl_b2ThzQ",
@@ -105,229 +115,342 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
-        const messagesContainer = document.getElementById('messages-container');
-        const connectionStatus = document.getElementById('connection-status');
-        const statusMessage = document.getElementById('status-message');
-        const retryButton = document.getElementById('retry-button');
 
-        let unsubscribeFunction = null;
-        let retryCount = 0;
-        const maxRetries = 3;
+        // Variables de seguridad
+        let loginAttempts = 0;
+        const maxLoginAttempts = 3;
+        let loginBlockedUntil = 0;
+        const sessionTimeout = 30 * 60 * 1000; // 30 minutos
+        let sessionTimer = null;
+        let lastActivityTime = Date.now();
 
-        // Función para sanitizar contenido HTML
-        function sanitizeHTML(str) {
-            if (typeof str !== 'string') return '';
-            const temp = document.createElement('div');
-            temp.textContent = str;
-            return temp.innerHTML;
+        // Elementos del DOM
+        const loginSection = document.getElementById('login-section');
+        const boardSection = document.getElementById('board-section');
+        const emailInput = document.getElementById('email-input');
+        const passwordInput = document.getElementById('password-input');
+        const emailPromptContainer = document.getElementById('email-prompt-container');
+        const passwordPromptContainer = document.getElementById('password-prompt-container');
+        const errorMessage = document.getElementById('error-message');
+        const postForm = document.getElementById('post-form');
+        const messageInput = document.getElementById('message-input');
+        const resetButton = document.getElementById('reset-button');
+        const logoutButton = document.getElementById('logout-button');
+        const resetStatus = document.getElementById('reset-status');
+        const charCounter = document.getElementById('char-counter');
+        const sessionStatus = document.getElementById('session-status');
+        const loginAttemptsDisplay = document.getElementById('login-attempts');
+        let enteredEmail = "";
+
+        // Funciones de seguridad
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email) && email.length <= 254;
         }
 
-        // Función para validar y formatear timestamp
-        function formatTimestamp(timestamp) {
-            try {
-                if (!timestamp || !timestamp.toDate) {
-                    return '[Fecha inválida]';
+        function sanitizeInput(input) {
+            return input.replace(/[<>'"&]/g, function(match) {
+                switch(match) {
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '"': return '&quot;';
+                    case "'": return '&#x27;';
+                    case '&': return '&amp;';
+                    default: return match;
                 }
-                const date = timestamp.toDate();
-                if (isNaN(date.getTime())) {
-                    return '[Fecha inválida]';
-                }
-                
-                const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                const diaSemana = diasSemana[date.getDay()];
-                
-                const dia = date.getDate().toString().padStart(2, '0');
-                const mes = (date.getMonth() + 1).toString().padStart(2, '0');
-                const año = date.getFullYear();
-                
-                let horas = date.getHours();
-                const minutos = date.getMinutes().toString().padStart(2, '0');
-                const segundos = date.getSeconds().toString().padStart(2, '0');
-                const periodo = horas >= 12 ? 'p.m.' : 'a.m.';
-                
-                if (horas > 12) {
-                    horas -= 12;
-                } else if (horas === 0) {
-                    horas = 12;
-                }
-                
-                const horasFormateadas = horas.toString().padStart(2, '0');
-                
-                return `[${diaSemana} ${dia}/${mes}/${año} ${horasFormateadas}:${minutos}:${segundos} ${periodo}]`;
-            } catch (error) {
-                console.error('Error al formatear timestamp:', error);
-                return '[Fecha inválida]';
+            }).substring(0, 1500);
+        }
+
+        function updateSessionStatus() {
+            const remainingTime = Math.max(0, sessionTimeout - (Date.now() - lastActivityTime));
+            const minutes = Math.floor(remainingTime / 60000);
+            const seconds = Math.floor((remainingTime % 60000) / 1000);
+            sessionStatus.textContent = `Sesión expira en: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (remainingTime <= 5 * 60 * 1000) { // 5 minutos restantes
+                sessionStatus.classList.add('warning');
+            } else {
+                sessionStatus.classList.remove('warning');
             }
         }
 
-        // Función para mostrar estado de conexión
-        function showConnectionStatus(message, showRetry = false) {
-            statusMessage.textContent = message;
-            connectionStatus.style.display = 'block';
-            retryButton.style.display = showRetry ? 'inline-block' : 'none';
-        }
-
-        function hideConnectionStatus() {
-            connectionStatus.style.display = 'none';
-            retryCount = 0;
-        }
-
-        // Función para crear elemento de mensaje
-        function createMessageElement(messageData, docId) {
-            try {
-                // Validar que el documento tenga los campos requeridos
-                if (!messageData.text || typeof messageData.text !== 'string') {
-                    console.warn('Documento con campo text inválido:', docId);
-                    return null;
+        function startSessionTimer() {
+            if (sessionTimer) clearInterval(sessionTimer);
+            
+            sessionTimer = setInterval(() => {
+                if (Date.now() - lastActivityTime > sessionTimeout) {
+                    logout('Sesión expirada por inactividad');
+                } else {
+                    updateSessionStatus();
                 }
+            }, 1000);
+        }
 
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('message');
-                messageElement.setAttribute('data-id', docId);
-                
-                const formattedTimestamp = formatTimestamp(messageData.createdAt);
-                const sanitizedText = sanitizeHTML(messageData.text);
-                
-                messageElement.innerHTML = `<span class="timestamp">${formattedTimestamp}</span><div class="text">${sanitizedText}</div>`;
-                
-                return messageElement;
-            } catch (error) {
-                console.error('Error creando elemento de mensaje:', error);
-                return null;
+        function resetActivityTimer() {
+            lastActivityTime = Date.now();
+        }
+
+        function logout(reason = 'Sesión cerrada') {
+            if (sessionTimer) clearInterval(sessionTimer);
+            signOut(auth).then(() => {
+                showLoginSection();
+                errorMessage.textContent = reason;
+                errorMessage.classList.add('warning');
+            });
+        }
+
+        function showLoginSection() {
+            loginSection.classList.remove('hidden');
+            boardSection.classList.add('hidden');
+            emailPromptContainer.classList.remove('hidden');
+            passwordPromptContainer.classList.add('hidden');
+            emailInput.focus();
+            enteredEmail = "";
+            emailInput.value = "";
+            passwordInput.value = "";
+        }
+
+        function showBoardSection() {
+            loginSection.classList.add('hidden');
+            boardSection.classList.remove('hidden');
+            messageInput.focus();
+            startSessionTimer();
+        }
+
+        function updateLoginAttemptsDisplay() {
+            if (loginAttempts > 0) {
+                const remaining = maxLoginAttempts - loginAttempts;
+                loginAttemptsDisplay.textContent = `Intentos restantes: ${remaining}`;
+                if (remaining <= 1) {
+                    loginAttemptsDisplay.classList.add('warning');
+                }
+            } else {
+                loginAttemptsDisplay.textContent = '';
+                loginAttemptsDisplay.classList.remove('warning');
             }
         }
 
-        // Función principal para cargar mensajes
-        function loadMessages() {
-            try {
-                // Limpiar suscripción anterior si existe
-                if (unsubscribeFunction) {
-                    unsubscribeFunction();
-                }
+        function isLoginBlocked() {
+            return Date.now() < loginBlockedUntil;
+        }
 
-                const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+        // Monitoreo del estado de autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                showBoardSection();
+                loginAttempts = 0;
+                updateLoginAttemptsDisplay();
+            } else {
+                showLoginSection();
+            }
+        });
+
+        // Listeners para actividad del usuario
+        ['keydown', 'mousedown', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, resetActivityTimer, true);
+        });
+
+        // Lógica del contador de caracteres
+        messageInput.addEventListener('input', () => {
+            const count = messageInput.value.length;
+            const limit = messageInput.maxLength;
+            charCounter.textContent = `${count}/${limit}`;
+            resetActivityTimer();
+        });
+
+        // Lógica de Login
+        emailInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
                 
-                unsubscribeFunction = onSnapshot(q, 
-                    (querySnapshot) => {
-                        try {
-                            messagesContainer.classList.remove('loading');
-                            messagesContainer.innerHTML = '';
-                            hideConnectionStatus();
-                            
-                            if (querySnapshot.empty) {
-                                messagesContainer.textContent = "No hay entradas en el sistema.";
-                                return;
-                            }
-                            
-                            // Procesar documentos con validación
-                            const validMessages = [];
-                            querySnapshot.forEach((doc) => {
-                                const messageElement = createMessageElement(doc.data(), doc.id);
-                                if (messageElement) {
-                                    validMessages.push(messageElement);
-                                }
-                            });
-                            
-                            // Agregar mensajes válidos al contenedor
-                            validMessages.forEach(messageElement => {
-                                messagesContainer.appendChild(messageElement);
-                            });
+                if (isLoginBlocked()) {
+                    const timeLeft = Math.ceil((loginBlockedUntil - Date.now()) / 1000);
+                    errorMessage.textContent = `Bloqueado temporalmente. Intenta en ${timeLeft} segundos.`;
+                    return;
+                }
+                
+                const email = emailInput.value.trim();
+                
+                if (!isValidEmail(email)) {
+                    errorMessage.textContent = "Formato de email inválido.";
+                    return;
+                }
+                
+                enteredEmail = email;
+                emailPromptContainer.classList.add('hidden');
+                passwordPromptContainer.classList.remove('hidden');
+                passwordInput.focus();
+                errorMessage.textContent = "";
+            }
+        });
 
-                            // Mostrar conteo de mensajes si es útil
-                            if (validMessages.length > 0) {
-                                console.log(`Cargados ${validMessages.length} mensajes correctamente`);
-                            }
-                            
-                        } catch (snapshotError) {
-                            console.error('Error procesando snapshot:', snapshotError);
-                            messagesContainer.classList.remove('loading');
-                            messagesContainer.textContent = "Error al procesar los datos recibidos.";
-                            showConnectionStatus('Error al procesar los mensajes recibidos.', true);
-                        }
-                    },
-                    (error) => {
-                        console.error('Error en la conexión a Firestore:', error);
-                        messagesContainer.classList.remove('loading');
+        passwordInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                
+                if (isLoginBlocked()) {
+                    const timeLeft = Math.ceil((loginBlockedUntil - Date.now()) / 1000);
+                    errorMessage.textContent = `Bloqueado temporalmente. Intenta en ${timeLeft} segundos.`;
+                    return;
+                }
+                
+                const password = passwordInput.value;
+                
+                if (password.length < 6) {
+                    errorMessage.textContent = "Contraseña muy corta.";
+                    return;
+                }
+                
+                signInWithEmailAndPassword(auth, enteredEmail, password)
+                    .then((userCredential) => {
+                        resetActivityTimer();
+                        // El estado se maneja en onAuthStateChanged
+                    })
+                    .catch((error) => {
+                        loginAttempts++;
+                        updateLoginAttemptsDisplay();
                         
-                        // Diferentes mensajes según el tipo de error
-                        let errorMessage = 'Error de conexión con la base de datos.';
-                        if (error.code === 'permission-denied') {
-                            errorMessage = 'Acceso denegado. Verifique los permisos de la base de datos.';
-                        } else if (error.code === 'unavailable') {
-                            errorMessage = 'Servicio temporalmente no disponible.';
+                        if (loginAttempts >= maxLoginAttempts) {
+                            loginBlockedUntil = Date.now() + 5 * 60 * 1000; // 5 minutos
+                            errorMessage.textContent = "Demasiados intentos fallidos. Bloqueado temporalmente.";
+                            loginAttempts = 0; // Reset para el próximo período
+                        } else {
+                            errorMessage.textContent = "Credenciales incorrectas.";
                         }
                         
-                        messagesContainer.textContent = "No se pudieron cargar las entradas.";
-                        showConnectionStatus(errorMessage, true);
-                    }
-                );
-
-            } catch (error) {
-                console.error('Error inicializando conexión:', error);
-                messagesContainer.classList.remove('loading');
-                messagesContainer.textContent = "Error al inicializar la conexión.";
-                showConnectionStatus('Error crítico al inicializar la aplicación.', true);
+                        passwordPromptContainer.classList.add('hidden');
+                        passwordInput.value = "";
+                        emailPromptContainer.classList.remove('hidden');
+                        emailInput.value = "";
+                        emailInput.focus();
+                        enteredEmail = "";
+                    });
             }
-        }
+        });
 
-        // Función para manejar reintentos
-        function handleRetry() {
-            if (retryCount >= maxRetries) {
-                showConnectionStatus(`Máximo número de reintentos alcanzado (${maxRetries}). Recarga la página.`, false);
-                retryButton.textContent = 'Recargar página';
-                retryButton.onclick = () => window.location.reload();
+        // Lógica para postear con validación mejorada
+        postForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resetActivityTimer();
+            
+            const messageText = messageInput.value.trim();
+            
+            // Validaciones
+            if (messageText.length === 0) {
+                resetStatus.textContent = "El mensaje no puede estar vacío.";
                 return;
             }
             
-            retryCount++;
-            messagesContainer.classList.add('loading');
-            messagesContainer.textContent = `Reintentando conexión... (${retryCount}/${maxRetries})`;
-            statusMessage.textContent = `Reintentando... (${retryCount}/${maxRetries})`;
-            retryButton.disabled = true;
+            if (messageText.length > 1500) {
+                resetStatus.textContent = "El mensaje excede el límite de caracteres.";
+                return;
+            }
             
-            // Esperar antes del reintento
-            setTimeout(() => {
-                retryButton.disabled = false;
-                loadMessages();
-            }, 2000);
-        }
+            // Sanitizar entrada
+            const sanitizedMessage = sanitizeInput(messageText);
+            
+            // Prevenir spam - limitar frecuencia de posts
+            const now = Date.now();
+            const lastPost = localStorage.getItem('lastPostTime');
+            if (lastPost && (now - parseInt(lastPost)) < 1000) { // 1 segundo mínimo entre posts
+                resetStatus.textContent = "Espera un momento antes de enviar otro mensaje.";
+                return;
+            }
+            
+            try {
+                resetStatus.textContent = "Enviando...";
+                await addDoc(collection(db, "messages"), { 
+                    text: sanitizedMessage, 
+                    createdAt: serverTimestamp(),
+                    userId: auth.currentUser.uid
+                });
+                messageInput.value = '';
+                charCounter.textContent = `0/${messageInput.maxLength}`;
+                resetStatus.textContent = "Mensaje enviado correctamente.";
+                resetStatus.classList.add('success');
+                localStorage.setItem('lastPostTime', now.toString());
+                
+                // Limpiar mensaje de éxito después de 3 segundos
+                setTimeout(() => {
+                    resetStatus.textContent = "";
+                    resetStatus.classList.remove('success');
+                }, 3000);
+                
+            } catch (error) {
+                console.error("Error al añadir documento: ", error);
+                resetStatus.textContent = "Error al enviar el mensaje.";
+            }
+        });
 
-        // Event listeners
-        retryButton.addEventListener('click', handleRetry);
+        // Lógica para logout
+        logoutButton.addEventListener('click', () => {
+            logout('Sesión cerrada manualmente');
+        });
 
-        // Manejo de visibilidad de página para optimizar recursos
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Página no visible, podríamos pausar actualizaciones si es necesario
-                console.log('Página oculta - manteniendo conexión');
-            } else {
-                // Página visible, asegurar que la conexión esté activa
-                console.log('Página visible');
-                if (!unsubscribeFunction) {
-                    loadMessages();
+        // Lógica para borrar todo con confirmación mejorada
+        resetButton.addEventListener('click', async () => {
+            resetActivityTimer();
+            
+            if (resetButton.classList.contains('confirm')) {
+                resetStatus.textContent = "Borrando...";
+                resetButton.disabled = true;
+                
+                try {
+                    const messagesCollection = collection(db, "messages");
+                    const querySnapshot = await getDocs(messagesCollection);
+                    const deletePromises = [];
+                    
+                    querySnapshot.forEach((doc) => {
+                        deletePromises.push(deleteDoc(doc.ref));
+                    });
+                    
+                    await Promise.all(deletePromises);
+                    resetStatus.textContent = `${deletePromises.length} mensajes han sido borrados.`;
+                    resetStatus.classList.add('success');
+                    
+                    // Log de auditoría básico en consola
+                    console.log(`Admin ${auth.currentUser.email} deleted all messages at ${new Date().toISOString()}`);
+                    
+                } catch (error) {
+                    console.error("Error al borrar todo: ", error);
+                    resetStatus.textContent = "Error al borrar los mensajes.";
+                } finally {
+                    resetButton.classList.remove('confirm');
+                    resetButton.textContent = 'Reset (Borrar todo)';
+                    resetButton.disabled = false;
+                    
+                    setTimeout(() => {
+                        resetStatus.textContent = "";
+                        resetStatus.classList.remove('success');
+                    }, 5000);
                 }
+            } else {
+                resetButton.classList.add('confirm');
+                resetButton.textContent = 'Confirmar Borrado';
+                resetStatus.textContent = "¿Estás seguro? Esta acción no se puede deshacer.";
+                resetStatus.classList.add('warning');
+                
+                // Auto-revert después de 10 segundos sin confirmación
+                setTimeout(() => {
+                    if (resetButton.classList.contains('confirm')) {
+                        resetButton.classList.remove('confirm');
+                        resetButton.textContent = 'Reset (Borrar todo)';
+                        resetStatus.textContent = "";
+                        resetStatus.classList.remove('warning');
+                    }
+                }, 10000);
             }
         });
 
-        // Cleanup al descargar la página
-        window.addEventListener('beforeunload', () => {
-            if (unsubscribeFunction) {
-                unsubscribeFunction();
+        // Prevenir que la página se cierre accidentalmente durante operaciones críticas
+        window.addEventListener('beforeunload', (event) => {
+            if (resetButton.classList.contains('confirm')) {
+                event.preventDefault();
+                event.returnValue = '';
             }
         });
-
-        // Inicializar con manejo de errores
-        try {
-            loadMessages();
-        } catch (error) {
-            console.error('Error crítico al inicializar:', error);
-            messagesContainer.classList.remove('loading');
-            messagesContainer.textContent = "Error crítico al inicializar la aplicación.";
-            showConnectionStatus('Error crítico. Recarga la página.', false);
-            retryButton.textContent = 'Recargar página';
-            retryButton.onclick = () => window.location.reload();
-        }
     </script>
 </body>
 </html>
