@@ -34,6 +34,27 @@
         .message.faded:hover { opacity: 1; }
         .timestamp { display: block; margin-bottom: 0.3em; color: #a11d1d; font-size: 0.9em; }
         .error { color: #ff4141; }
+        a { color: inherit; }
+        sup.fn {
+            cursor: pointer;
+            font-size: 0.7em;
+            vertical-align: super;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+        .footnotes {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, margin 0.3s ease;
+            font-size: 0.85em;
+            opacity: 0.6;
+            margin: 0;
+        }
+        .footnotes.open {
+            max-height: 500px;
+            margin-top: 0.5em;
+        }
+        .footnotes span { display: block; }
         @media (min-width: 768px) { body { padding-left: 20vw; } }
     </style>
 </head>
@@ -56,11 +77,32 @@
             } catch { return '[Fecha inválida]'; }
         }
 
-        function linkify(text) {
-            return text.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
-                const label = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-                return `<a href="${url}" target="_blank" rel="noopener" style="color:inherit">${label}</a>`;
+        function formatText(text, msgId) {
+            let s = text.replace(/</g, '&lt;');
+            // footnotes
+            let fnCount = 0;
+            const footnotes = [];
+            s = s.replace(/\{([^}]+)\}/g, (_, content) => {
+                fnCount++;
+                footnotes.push(content);
+                return `<sup class="fn" data-msg="${msgId}">${fnCount}</sup>`;
             });
+            // bold, underline, strikethrough
+            s = s.replace(/\*([^*]+)\*/g, '<b>$1</b>');
+            s = s.replace(/_([^_]+)_/g, '<u>$1</u>');
+            s = s.replace(/~([^~]+)~/g, '<s>$1</s>');
+            // links
+            s = s.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+                const label = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+            });
+            // footnotes block
+            if (footnotes.length) {
+                s += `<div class="footnotes" id="fn-${msgId}">` +
+                    footnotes.map((f, i) => `<span>${i + 1}. ${f}</span>`).join('') +
+                    '</div>';
+            }
+            return s;
         }
 
         async function load() {
@@ -71,8 +113,21 @@
                 const messages = await res.json();
                 if (!messages.length) { el.textContent = 'No hay entradas.'; return; }
                 el.innerHTML = messages.map((m, i) => 
-                    `<div class="message${i > 0 ? ' faded' : ''}"><span class="timestamp">${formatDate(m.date)}</span><div>${linkify(m.text.replace(/</g,'&lt;'))}</div></div>`
+                    `<div class="message${i > 0 ? ' faded' : ''}"><span class="timestamp">${formatDate(m.date)}</span><div>${formatText(m.text, i)}</div></div>`
                 ).join('');
+                // footnote hover
+                el.addEventListener('mouseenter', (e) => {
+                    if (!e.target.classList.contains('fn')) return;
+                    const id = e.target.dataset.msg;
+                    const block = document.getElementById('fn-' + id);
+                    if (block) block.classList.add('open');
+                }, true);
+                el.addEventListener('mouseleave', (e) => {
+                    if (!e.target.classList.contains('fn')) return;
+                    const id = e.target.dataset.msg;
+                    const block = document.getElementById('fn-' + id);
+                    if (block) block.classList.remove('open');
+                }, true);
             } catch (e) {
                 el.innerHTML = '<span class="error">Error al cargar.</span>';
             }

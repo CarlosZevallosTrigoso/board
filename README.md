@@ -39,3 +39,11 @@ Reemplazar el contenido de `messages.json` con:
 ## Borrar una nota específica
 
 Eliminar el objeto correspondiente del array. Cuidar que las comas entre objetos queden bien (sin coma después del último objeto).
+
+## Formato de texto
+
+- `*negrita*`
+- `_subrayado_`
+- `~tachado~`
+- URLs se convierten en enlaces automáticamente
+- `{texto entre llaves}` se convierte en nota al pie (número superíndice, visible al hacer hover)

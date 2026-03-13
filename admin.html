@@ -20,7 +20,7 @@
         textarea {
             font: inherit;
             width: 100%;
-            height: 80px;
+            height: 100px;
             border: 1px solid #000;
             padding: 8px;
             resize: vertical;
@@ -50,6 +50,40 @@
         .status { margin-top: 10px; font-size: 0.9em; }
         .status.ok { color: #a11d1d; }
         .status.err { color: #ff4141; }
+        #preview {
+            border: 1px solid #ddd;
+            padding: 12px;
+            margin-top: 15px;
+            min-height: 2em;
+            display: none;
+        }
+        #preview-label { 
+            font-size: 0.85em; 
+            opacity: 0.5; 
+            margin-top: 15px;
+            display: none;
+        }
+        .legend {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.85em;
+            opacity: 0.5;
+        }
+        .legend span { display: block; margin-bottom: 0.3em; }
+        a { color: inherit; }
+        sup.fn {
+            font-size: 0.7em;
+            vertical-align: super;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+        .footnotes {
+            font-size: 0.85em;
+            opacity: 0.6;
+            margin-top: 0.5em;
+        }
+        .footnotes span { display: block; }
         @media (min-width: 768px) { body { padding-left: 20vw; } }
     </style>
 </head>
@@ -57,16 +91,27 @@
     <div class="container">
         <h1><a href="./" style="color:inherit;text-decoration:none">Notas</a> / Nueva nota</h1>
         <textarea id="input" placeholder="Escribe aquí..."></textarea>
+        <div id="preview-label">Vista previa:</div>
+        <div id="preview"></div>
         <div>
             <button id="generate">Generar</button>
             <button id="copy" style="display:none">Copiar todo</button>
         </div>
         <div class="status" id="status"></div>
         <pre id="output"></pre>
+        <div class="legend">
+            <span>*negrita*</span>
+            <span>_subrayado_</span>
+            <span>~tachado~</span>
+            <span>https://... &rarr; enlace automático</span>
+            <span>{texto de nota al pie}</span>
+        </div>
     </div>
     <script>
         const input = document.getElementById('input');
         const output = document.getElementById('output');
+        const preview = document.getElementById('preview');
+        const previewLabel = document.getElementById('preview-label');
         const generateBtn = document.getElementById('generate');
         const copyBtn = document.getElementById('copy');
         const status = document.getElementById('status');
@@ -78,10 +123,47 @@
             return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
+        function formatText(text) {
+            let s = text.replace(/</g, '&lt;');
+            let fnCount = 0;
+            const footnotes = [];
+            s = s.replace(/\{([^}]+)\}/g, (_, content) => {
+                fnCount++;
+                footnotes.push(content);
+                return `<sup class="fn">${fnCount}</sup>`;
+            });
+            s = s.replace(/\*([^*]+)\*/g, '<b>$1</b>');
+            s = s.replace(/_([^_]+)_/g, '<u>$1</u>');
+            s = s.replace(/~([^~]+)~/g, '<s>$1</s>');
+            s = s.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+                const label = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+            });
+            if (footnotes.length) {
+                s += '<div class="footnotes">' +
+                    footnotes.map((f, i) => `<span>${i + 1}. ${f}</span>`).join('') +
+                    '</div>';
+            }
+            return s;
+        }
+
         function msg(text, type) {
             status.textContent = text;
             status.className = 'status ' + type;
         }
+
+        // live preview
+        input.addEventListener('input', () => {
+            const text = input.value.trim();
+            if (text) {
+                preview.innerHTML = formatText(text);
+                preview.style.display = 'block';
+                previewLabel.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+                previewLabel.style.display = 'none';
+            }
+        });
 
         generateBtn.addEventListener('click', async () => {
             const text = input.value.trim();
