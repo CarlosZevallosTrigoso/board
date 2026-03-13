@@ -57,7 +57,10 @@
         }
 
         function linkify(text) {
-            return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit">$1</a>');
+            return text.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+                const label = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                return `<a href="${url}" target="_blank" rel="noopener" style="color:inherit">${label}</a>`;
+            });
         }
 
         async function load() {
