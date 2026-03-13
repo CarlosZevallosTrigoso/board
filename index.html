@@ -29,11 +29,10 @@
         .message { 
             margin-bottom: 1em; 
             transition: opacity 0.3s;
-            cursor: default;
+            cursor: pointer;
         }
-        .message.faded { opacity: 0.15; cursor: pointer; }
+        .message.faded { opacity: 0.15; }
         .message.faded:hover { opacity: 1; }
-        .message.pinned { opacity: 1; }
         .timestamp { display: block; margin-bottom: 0.3em; color: #a11d1d; font-size: 0.9em; }
         .error { color: #ff4141; }
         a { color: inherit; }
@@ -128,16 +127,20 @@
                 const messages = await res.json();
                 if (!messages.length) { el.textContent = 'No hay entradas.'; return; }
 
-                el.innerHTML = messages.map((m, i) => 
-                    `<div class="message${i > 0 ? ' faded' : ''}" id="${dateToId(m.date)}" data-date="${m.date}"><span class="timestamp">${formatDate(m.date)}</span><div class="text">${formatText(m.text, i)}</div></div>`
-                ).join('');
+                const hash = window.location.hash ? window.location.hash.slice(1) : null;
 
-                // click to pin/unpin faded messages
+                el.innerHTML = messages.map((m, i) => {
+                    const id = dateToId(m.date);
+                    const lit = hash ? id === hash : i === 0;
+                    return `<div class="message${lit ? '' : ' faded'}" id="${id}" data-date="${m.date}"><span class="timestamp">${formatDate(m.date)}</span><div class="text">${formatText(m.text, i)}</div></div>`;
+                }).join('');
+
+                // click to toggle any message
                 el.addEventListener('click', (e) => {
-                    const msg = e.target.closest('.message.faded, .message.pinned');
-                    if (!msg || msg === el.querySelector('.message:first-child')) return;
+                    const msg = e.target.closest('.message');
+                    if (!msg) return;
                     if (e.target.closest('a, .fn')) return;
-                    msg.classList.toggle('pinned');
+                    msg.classList.toggle('faded');
                 });
 
                 // footnote hover
@@ -172,12 +175,9 @@
                 });
 
                 // scroll to anchor on load
-                if (window.location.hash) {
-                    const target = document.getElementById(window.location.hash.slice(1));
-                    if (target) {
-                        target.classList.add('pinned');
-                        target.scrollIntoView({ behavior: 'smooth' });
-                    }
+                if (hash) {
+                    const target = document.getElementById(hash);
+                    if (target) target.scrollIntoView({ behavior: 'smooth' });
                 }
 
             } catch (e) {
