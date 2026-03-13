@@ -56,6 +56,10 @@
             } catch { return '[Fecha inválida]'; }
         }
 
+        function linkify(text) {
+            return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit">$1</a>');
+        }
+
         async function load() {
             const el = document.getElementById('messages');
             try {
@@ -64,7 +68,7 @@
                 const messages = await res.json();
                 if (!messages.length) { el.textContent = 'No hay entradas.'; return; }
                 el.innerHTML = messages.map((m, i) => 
-                    `<div class="message${i > 0 ? ' faded' : ''}"><span class="timestamp">${formatDate(m.date)}</span><div>${m.text.replace(/</g,'&lt;')}</div></div>`
+                    `<div class="message${i > 0 ? ' faded' : ''}"><span class="timestamp">${formatDate(m.date)}</span><div>${linkify(m.text.replace(/</g,'&lt;'))}</div></div>`
                 ).join('');
             } catch (e) {
                 el.innerHTML = '<span class="error">Error al cargar.</span>';
