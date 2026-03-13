@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background: #fff; 
+            color: #000; 
+            font: 16px/1.5 'Roboto Mono', monospace; 
+            margin: 0; 
+            padding: 10vh 20px 20px; 
+        }
+        .container { max-width: 800px; }
+        h1 { font-size: 1em; font-weight: normal; margin-bottom: 1.5em; }
+        .message { margin-bottom: 1em; }
+        .timestamp { display: block; margin-bottom: 0.3em; color: #a11d1d; font-size: 0.9em; }
+        .error { color: #ff4141; }
+        @media (min-width: 768px) { body { padding-left: 20vw; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Notas</h1>
+        <div id="messages">Cargando...</div>
+    </div>
+    <script>
+        function formatDate(str) {
+            try {
+                const d = new Date(str);
+                if (isNaN(d)) return '[Fecha inválida]';
+                const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                const pad = n => String(n).padStart(2, '0');
+                let h = d.getHours();
+                const ampm = h >= 12 ? 'p.m.' : 'a.m.';
+                h = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                return `[${dias[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}]`;
+            } catch { return '[Fecha inválida]'; }
+        }
+
+        async function load() {
+            const el = document.getElementById('messages');
+            try {
+                const res = await fetch('./messages.json');
+                if (!res.ok) throw new Error(res.status);
+                const messages = await res.json();
+                if (!messages.length) { el.textContent = 'No hay entradas.'; return; }
+                el.innerHTML = messages.map(m => 
+                    `<div class="message"><span class="timestamp">${formatDate(m.date)}</span><div>${m.text.replace(/</g,'&lt;')}</div></div>`
+                ).join('');
+            } catch (e) {
+                el.innerHTML = '<span class="error">Error al cargar.</span>';
+            }
+        }
+
+        load();
+    </script>
+</body>
+</html>
