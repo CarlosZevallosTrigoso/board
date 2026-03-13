@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva nota</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background: #fff; 
+            color: #000; 
+            font: 16px/1.5 'Roboto Mono', monospace; 
+            margin: 0; 
+            padding: 10vh 20px 20px; 
+        }
+        .container { max-width: 800px; }
+        h1 { font-size: 1em; font-weight: normal; margin-bottom: 1.5em; }
+        textarea {
+            font: inherit;
+            width: 100%;
+            height: 80px;
+            border: 1px solid #000;
+            padding: 8px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        button {
+            font: inherit;
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background: #333; }
+        pre {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 12px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+        .status { margin-top: 10px; font-size: 0.9em; }
+        .status.ok { color: #a11d1d; }
+        .status.err { color: #ff4141; }
+        @media (min-width: 768px) { body { padding-left: 20vw; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nueva nota</h1>
+        <textarea id="input" placeholder="Escribe aquí..."></textarea>
+        <div>
+            <button id="generate">Generar</button>
+            <button id="copy" style="display:none">Copiar todo</button>
+        </div>
+        <div class="status" id="status"></div>
+        <pre id="output"></pre>
+    </div>
+    <script>
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+        const generateBtn = document.getElementById('generate');
+        const copyBtn = document.getElementById('copy');
+        const status = document.getElementById('status');
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+
+        function timestamp() {
+            const d = new Date();
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function msg(text, type) {
+            status.textContent = text;
+            status.className = 'status ' + type;
+        }
+
+        generateBtn.addEventListener('click', async () => {
+            const text = input.value.trim();
+            if (!text) { msg('Escribe algo primero.', 'err'); return; }
+
+            msg('Cargando messages.json...', '');
+            try {
+                const res = await fetch('./messages.json');
+                if (!res.ok) throw new Error(res.status);
+                const messages = await res.json();
+                messages.unshift({ text, date: timestamp() });
+                const json = JSON.stringify(messages, null, 2);
+                output.textContent = json;
+                output.style.display = 'block';
+                copyBtn.style.display = 'inline';
+                msg('Listo. Copia y reemplaza todo el contenido de messages.json.', 'ok');
+            } catch (e) {
+                msg('Error al cargar messages.json: ' + e.message, 'err');
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(output.textContent).then(() => {
+                msg('Copiado. Ve a messages.json en GitHub, selecciona todo, pega, commit.', 'ok');
+            });
+        });
+    </script>
+</body>
+</html>
