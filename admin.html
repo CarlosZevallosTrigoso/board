@@ -104,6 +104,7 @@
             <span>_subrayado_</span>
             <span>~tachado~</span>
             <span>https://... &rarr; enlace automático</span>
+            <span>[texto](https://...) &rarr; enlace con texto</span>
             <span>{texto de nota al pie}</span>
         </div>
     </div>
@@ -135,7 +136,8 @@
             s = s.replace(/\*([^*]+)\*/g, '<b>$1</b>');
             s = s.replace(/_([^_]+)_/g, '<u>$1</u>');
             s = s.replace(/~([^~]+)~/g, '<s>$1</s>');
-            s = s.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+            s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            s = s.replace(/(https?:\/\/[^\s<]+)(?![^<]*<\/a>)/g, (url) => {
                 const label = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
                 return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
             });
