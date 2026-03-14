@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notas</title>
+    <title>ctz-brd</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
@@ -11,11 +11,11 @@
         body { 
             background: #fff; 
             color: #000; 
-            font: 16px/1.5 'Roboto Mono', monospace; 
+            font: 11px/1.5 'Roboto Mono', monospace; 
             margin: 0; 
             padding: 0 20px 20px; 
         }
-        .container { max-width: 800px; }
+        .container { max-width: 560px; }
         h1 { 
             font-size: 1em; 
             font-weight: normal; 
@@ -61,7 +61,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Notas</h1>
+        <h1>ctz-brd</h1>
         <div id="messages">Cargando...</div>
     </div>
     <script>
@@ -169,7 +169,7 @@
                     const url = baseUrl + '#' + dateToId(date);
                     const cited = formatDateChicago(date);
                     const text = selection.toString();
-                    const citation = `\n\nCarlos Zevallos Trigoso, "${cited}," Notas, ${url}.`;
+                    const citation = `\n\nCarlos Zevallos Trigoso, "${cited}," ctz-brd, ${url}.`;
                     e.preventDefault();
                     e.clipboardData.setData('text/plain', text + citation);
                 });
